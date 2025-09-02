@@ -166,6 +166,9 @@ class MainActivity : AppCompatActivity() {
         binding.btnStopRealTime.isEnabled = true
         binding.tvStatus.text = "Real-time spectrogram active"
         
+        // Start streaming mode in the spectrogram view
+        binding.spectrogramView.startStreaming()
+        
         realTimeProcessor.startRecording(
             onFrameData = { frame ->
                 // Update the spectrogram view with new frame data
@@ -178,6 +181,7 @@ class MainActivity : AppCompatActivity() {
     
     private fun stopRealTimeSpectrogram() {
         realTimeProcessor.stopRecording()
+        binding.spectrogramView.stopStreaming()
         binding.btnRealTime.isEnabled = true
         binding.btnStopRealTime.isEnabled = false
         binding.tvStatus.text = "Real-time spectrogram stopped"
@@ -186,6 +190,12 @@ class MainActivity : AppCompatActivity() {
     private fun updateRealTimeSpectrogram(frame: SpectrogramFrame) {
         // Update the spectrogram view with real-time data
         binding.spectrogramView.updateSpectrogramData(listOf(frame))
+        
+        // Show memory usage periodically
+        val memoryStats = binding.spectrogramView.getMemoryStats()
+        if (memoryStats.isMemoryHigh) {
+            binding.tvStatus.text = "High memory usage: ${memoryStats.memoryUsagePercent.toInt()}%"
+        }
     }
     
     override fun onDestroy() {
