@@ -39,13 +39,33 @@
                 android:textStyle="bold"
                 android:layout_marginBottom="12dp" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnSelectFile"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Select Audio File"
-                app:icon="@android:drawable/ic_menu_upload"
-                style="@style/Widget.Material3.Button" />
+                android:orientation="horizontal"
+                android:gravity="center">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnSelectFile"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="8dp"
+                    android:text="Single File"
+                    app:icon="@android:drawable/ic_menu_upload"
+                    style="@style/Widget.Material3.Button" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBatchProcess"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="8dp"
+                    android:text="Batch Files"
+                    app:icon="@android:drawable/ic_menu_agenda"
+                    style="@style/Widget.Material3.Button.OutlinedButton" />
+
+            </LinearLayout>
 
             <ProgressBar
                 android:id="@+id/progressBar"
