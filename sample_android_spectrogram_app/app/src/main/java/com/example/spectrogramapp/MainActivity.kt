@@ -1,9 +1,7 @@
 package com.example.spectrogramapp
 
-import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.media.MediaRecorder
 import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
@@ -13,7 +11,6 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.example.spectrogramapp.databinding.ActivityMainBinding
 import com.example.spectrogramapp.spectrogram.FFmpegSpectrogramGenerator
-import com.example.spectrogramapp.spectrogram.RealTimeAudioProcessor
 import com.example.spectrogramapp.spectrogram.SpectrogramView
 import java.io.File
 
@@ -21,17 +18,8 @@ class MainActivity : AppCompatActivity() {
     
     private lateinit var binding: ActivityMainBinding
     private lateinit var spectrogramGenerator: FFmpegSpectrogramGenerator
-    private lateinit var realTimeProcessor: RealTimeAudioProcessor
     
-    private val requestPermissionLauncher = registerForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        if (isGranted) {
-            startRealTimeSpectrogram()
-        } else {
-            Toast.makeText(this, "Permission required for microphone access", Toast.LENGTH_SHORT).show()
-        }
-    }
+
     
     private val pickAudioFile = registerForActivityResult(
         ActivityResultContracts.GetContent()
@@ -51,25 +39,12 @@ class MainActivity : AppCompatActivity() {
     
     private fun initializeComponents() {
         spectrogramGenerator = FFmpegSpectrogramGenerator()
-        realTimeProcessor = RealTimeAudioProcessor()
     }
     
     private fun setupUI() {
         binding.apply {
             btnSelectFile.setOnClickListener {
                 pickAudioFile.launch("audio/*")
-            }
-            
-            btnRealTime.setOnClickListener {
-                if (checkMicrophonePermission()) {
-                    startRealTimeSpectrogram()
-                } else {
-                    requestMicrophonePermission()
-                }
-            }
-            
-            btnStopRealTime.setOnClickListener {
-                stopRealTimeSpectrogram()
             }
             
             // Initialize spectrogram view
@@ -89,17 +64,6 @@ class MainActivity : AppCompatActivity() {
                 STORAGE_PERMISSION_REQUEST_CODE
             )
         }
-    }
-    
-    private fun checkMicrophonePermission(): Boolean {
-        return ContextCompat.checkSelfPermission(
-            this,
-            Manifest.permission.RECORD_AUDIO
-        ) == PackageManager.PERMISSION_GRANTED
-    }
-    
-    private fun requestMicrophonePermission() {
-        requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
     }
     
     private fun processAudioFile(audioFilePath: String) {
@@ -161,46 +125,8 @@ class MainActivity : AppCompatActivity() {
         }
     }
     
-    private fun startRealTimeSpectrogram() {
-        binding.btnRealTime.isEnabled = false
-        binding.btnStopRealTime.isEnabled = true
-        binding.tvStatus.text = "Real-time spectrogram active"
-        
-        // Start streaming mode in the spectrogram view
-        binding.spectrogramView.startStreaming()
-        
-        realTimeProcessor.startRecording(
-            onFrameData = { frame ->
-                // Update the spectrogram view with new frame data
-                runOnUiThread {
-                    updateRealTimeSpectrogram(frame)
-                }
-            }
-        )
-    }
-    
-    private fun stopRealTimeSpectrogram() {
-        realTimeProcessor.stopRecording()
-        binding.spectrogramView.stopStreaming()
-        binding.btnRealTime.isEnabled = true
-        binding.btnStopRealTime.isEnabled = false
-        binding.tvStatus.text = "Real-time spectrogram stopped"
-    }
-    
-    private fun updateRealTimeSpectrogram(frame: SpectrogramFrame) {
-        // Update the spectrogram view with real-time data
-        binding.spectrogramView.updateSpectrogramData(listOf(frame))
-        
-        // Show memory usage periodically
-        val memoryStats = binding.spectrogramView.getMemoryStats()
-        if (memoryStats.isMemoryHigh) {
-            binding.tvStatus.text = "High memory usage: ${memoryStats.memoryUsagePercent.toInt()}%"
-        }
-    }
-    
     override fun onDestroy() {
         super.onDestroy()
-        realTimeProcessor.stopRecording()
     }
     
     companion object {

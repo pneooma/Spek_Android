@@ -30,10 +30,7 @@ class SpectrogramDataManager {
     private var pageSize = DEFAULT_PAGE_SIZE
     private var currentPage = 0
     
-    // Streaming support
-    private val streamingBuffer = mutableListOf<SpectrogramFrame>()
-    private val streamingBufferSize = 50 // Keep last 50 frames for real-time display
-    private var isStreaming = false
+
     
     // Coroutine scope for background operations
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -42,7 +39,6 @@ class SpectrogramDataManager {
     // Callbacks
     private var onMemoryWarning: ((String) -> Unit)? = null
     private var onPageLoaded: ((Int, List<SpectrogramFrame>) -> Unit)? = null
-    private var onStreamingData: ((List<SpectrogramFrame>) -> Unit)? = null
     
     init {
         startMemoryMonitoring()
@@ -122,51 +118,7 @@ class SpectrogramDataManager {
         return result
     }
     
-    /**
-     * Start streaming mode for real-time data
-     */
-    fun startStreaming() {
-        isStreaming = true
-        streamingBuffer.clear()
-        Log.d(TAG, "Started streaming mode")
-    }
-    
-    /**
-     * Stop streaming mode
-     */
-    fun stopStreaming() {
-        isStreaming = false
-        streamingBuffer.clear()
-        Log.d(TAG, "Stopped streaming mode")
-    }
-    
-    /**
-     * Add streaming frame (for real-time processing)
-     */
-    fun addStreamingFrame(frame: SpectrogramFrame) {
-        if (!isStreaming) return
-        
-        synchronized(streamingBuffer) {
-            streamingBuffer.add(frame)
-            
-            // Keep only the last N frames
-            if (streamingBuffer.size > streamingBufferSize) {
-                streamingBuffer.removeAt(0)
-            }
-            
-            // Notify streaming data available
-            onStreamingData?.invoke(streamingBuffer.toList())
-        }
-    }
-    
-    /**
-     * Get current streaming data
-     */
-    fun getStreamingData(): List<SpectrogramFrame> {
-        return synchronized(streamingBuffer) {
-            streamingBuffer.toList()
-        }
-    }
+
     
     /**
      * Clear all data and reset state
@@ -174,7 +126,6 @@ class SpectrogramDataManager {
     fun clear() {
         framePages.clear()
         pageTimestamps.clear()
-        streamingBuffer.clear()
         currentMemoryUsage = 0L
         totalFrames = 0
         currentPage = 0
@@ -270,12 +221,7 @@ class SpectrogramDataManager {
         onPageLoaded = callback
     }
     
-    /**
-     * Set streaming data callback
-     */
-    fun setStreamingDataCallback(callback: (List<SpectrogramFrame>) -> Unit) {
-        onStreamingData = callback
-    }
+
     
     /**
      * Get memory usage statistics

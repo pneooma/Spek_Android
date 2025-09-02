@@ -72,11 +72,7 @@ class SpectrogramView @JvmOverloads constructor(
             invalidate()
         }
         
-        dataManager.setStreamingDataCallback { frames ->
-            // Update view for real-time streaming
-            updateMagnitudeRange(frames)
-            invalidate()
-        }
+
     }
     
     /**
@@ -112,26 +108,8 @@ class SpectrogramView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         
-        val currentData = dataManager.getStreamingData()
-        if (currentData.isEmpty()) {
-            drawEmptyState(canvas)
-            return
-        }
-        
-        // Clear background
-        canvas.drawColor(Color.BLACK)
-        
-        // Draw spectrogram
-        drawSpectrogram(canvas, currentData)
-        
-        // Draw grid and labels
-        if (gridEnabled) {
-            drawGrid(canvas, currentData)
-        }
-        
-        if (axisLabelsEnabled) {
-            drawAxisLabels(canvas, currentData)
-        }
+        // For now, show empty state since we're not using real-time data
+        drawEmptyState(canvas)
     }
     
     /**
@@ -417,19 +395,7 @@ class SpectrogramView @JvmOverloads constructor(
         return dataManager.getMemoryStats()
     }
     
-    /**
-     * Start streaming mode for real-time data
-     */
-    fun startStreaming() {
-        dataManager.startStreaming()
-    }
-    
-    /**
-     * Stop streaming mode
-     */
-    fun stopStreaming() {
-        dataManager.stopStreaming()
-    }
+
 }
 
 /**

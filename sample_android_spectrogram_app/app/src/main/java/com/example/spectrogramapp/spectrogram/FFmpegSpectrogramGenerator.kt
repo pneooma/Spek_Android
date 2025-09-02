@@ -157,72 +157,7 @@ class FFmpegSpectrogramGenerator {
         }
     }
     
-    /**
-     * Generate real-time spectrogram data from audio stream
-     * @param audioData Raw audio data
-     * @param sampleRate Sample rate of the audio
-     * @param onFrameData Callback with spectrogram frame data
-     */
-    fun generateRealTimeSpectrogram(
-        audioData: ByteArray,
-        sampleRate: Int = DEFAULT_SAMPLE_RATE,
-        onFrameData: (SpectrogramFrame) -> Unit
-    ) {
-        try {
-            // For real-time processing, we need to process smaller chunks
-            val chunkSize = DEFAULT_FFT_SIZE * 2 // 16-bit samples
-            
-            if (audioData.size >= chunkSize) {
-                // Process audio in chunks
-                val chunks = audioData.chunked(chunkSize)
-                
-                chunks.forEachIndexed { index, chunk ->
-                    if (chunk.size == chunkSize) {
-                        val frame = processAudioChunk(chunk.toByteArray(), sampleRate, index.toLong())
-                        onFrameData(frame)
-                    }
-                }
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in real-time spectrogram generation", e)
-        }
-    }
-    
-    /**
-     * Process a single audio chunk and return spectrogram frame
-     */
-    private fun processAudioChunk(
-        audioChunk: ByteArray,
-        sampleRate: Int,
-        timestamp: Long
-    ): SpectrogramFrame {
-        // Convert byte array to short array (16-bit audio)
-        val shortArray = ShortArray(audioChunk.size / 2)
-        for (i in shortArray.indices) {
-            val low = audioChunk[i * 2].toInt() and 0xFF
-            val high = audioChunk[i * 2 + 1].toInt() and 0xFF
-            shortArray[i] = ((high shl 8) or low).toShort()
-        }
-        
-        // Apply window function (Hamming window)
-        val windowedData = applyHammingWindow(shortArray)
-        
-        // Perform FFT (simplified - in real implementation, use proper FFT library)
-        val fftResult = performFFT(windowedData)
-        
-        // Convert to frequency domain
-        val frequencies = generateFrequencyArray(fftResult.size, sampleRate)
-        val magnitudes = calculateMagnitudes(fftResult)
-        
-        return SpectrogramFrame(
-            timestamp = timestamp,
-            frequencies = frequencies,
-            magnitudes = magnitudes,
-            sampleRate = sampleRate,
-            fftSize = fftResult.size
-        )
-    }
+
     
     /**
      * Build FFmpeg filter complex string for spectrogram generation
