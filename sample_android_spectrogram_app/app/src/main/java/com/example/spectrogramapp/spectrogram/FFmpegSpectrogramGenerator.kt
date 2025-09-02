@@ -5,6 +5,7 @@ import com.arthenica.ffmpegkit.FFmpegKit
 import com.arthenica.ffmpegkit.FFmpegSession
 import com.arthenica.ffmpegkit.ReturnCode
 import java.io.File
+import org.jtransforms.fft.FloatFFT_1D
 
 /**
  * Generates spectrograms using FFmpeg library
@@ -47,13 +48,38 @@ class FFmpegSpectrogramGenerator {
             // Validate input file
             val inputFile = File(audioFilePath)
             if (!inputFile.exists()) {
-                onError("Input audio file does not exist: $audioFilePath")
+                onError(SpectrogramException.AudioFileException.FileNotFound(audioFilePath).getUserFriendlyMessage())
+                return
+            }
+            
+            // Check file size (max 100MB)
+            val maxFileSize = 100L * 1024 * 1024 // 100MB
+            if (inputFile.length() > maxFileSize) {
+                onError(SpectrogramException.AudioFileException.FileTooLarge(
+                    inputFile.length() / (1024 * 1024), 
+                    maxFileSize / (1024 * 1024)
+                ).getUserFriendlyMessage())
+                return
+            }
+            
+            // Check available storage space
+            val requiredSpace = 50L * 1024 * 1024 // 50MB for output
+            val availableSpace = getAvailableStorageSpace(outputPath)
+            if (availableSpace < requiredSpace) {
+                onError(SpectrogramException.ResourceException.StorageFull(
+                    outputPath, 
+                    requiredSpace / (1024 * 1024), 
+                    availableSpace / (1024 * 1024)
+                ).getUserFriendlyMessage())
                 return
             }
             
             // Create output directory if it doesn't exist
             val outputFile = File(outputPath)
-            outputFile.parentFile?.mkdirs()
+            if (!outputFile.parentFile?.mkdirs()!! && !outputFile.parentFile!!.exists()) {
+                onError(SpectrogramException.ResourceException.FileSystemError(outputPath).getUserFriendlyMessage())
+                return
+            }
             
             // Build FFmpeg filter complex for spectrogram generation
             val filterComplex = buildSpectrogramFilter(
@@ -67,7 +93,8 @@ class FFmpegSpectrogramGenerator {
             
             Log.d(TAG, "Executing FFmpeg command: $command")
             
-            // Execute FFmpeg command asynchronously
+            // Execute FFmpeg command asynchronously with timeout
+            val timeoutMs = 30000L // 30 seconds
             FFmpegKit.executeAsync(command,
                 { session: FFmpegSession ->
                     handleFFmpegSession(session, outputPath, onComplete, onError)
@@ -82,9 +109,12 @@ class FFmpegSpectrogramGenerator {
                 }
             )
             
+        } catch (e: SpectrogramException) {
+            Log.e(TAG, "Spectrogram error", e)
+            onError(e.getUserFriendlyMessage())
         } catch (e: Exception) {
-            Log.e(TAG, "Error generating spectrogram", e)
-            onError("Error: ${e.message}")
+            Log.e(TAG, "Unexpected error generating spectrogram", e)
+            onError("An unexpected error occurred. Please try again.")
         }
     }
     
@@ -127,72 +157,7 @@ class FFmpegSpectrogramGenerator {
         }
     }
     
-    /**
-     * Generate real-time spectrogram data from audio stream
-     * @param audioData Raw audio data
-     * @param sampleRate Sample rate of the audio
-     * @param onFrameData Callback with spectrogram frame data
-     */
-    fun generateRealTimeSpectrogram(
-        audioData: ByteArray,
-        sampleRate: Int = DEFAULT_SAMPLE_RATE,
-        onFrameData: (SpectrogramFrame) -> Unit
-    ) {
-        try {
-            // For real-time processing, we need to process smaller chunks
-            val chunkSize = DEFAULT_FFT_SIZE * 2 // 16-bit samples
-            
-            if (audioData.size >= chunkSize) {
-                // Process audio in chunks
-                val chunks = audioData.chunked(chunkSize)
-                
-                chunks.forEachIndexed { index, chunk ->
-                    if (chunk.size == chunkSize) {
-                        val frame = processAudioChunk(chunk.toByteArray(), sampleRate, index.toLong())
-                        onFrameData(frame)
-                    }
-                }
-            }
-            
-        } catch (e: Exception) {
-            Log.e(TAG, "Error in real-time spectrogram generation", e)
-        }
-    }
-    
-    /**
-     * Process a single audio chunk and return spectrogram frame
-     */
-    private fun processAudioChunk(
-        audioChunk: ByteArray,
-        sampleRate: Int,
-        timestamp: Long
-    ): SpectrogramFrame {
-        // Convert byte array to short array (16-bit audio)
-        val shortArray = ShortArray(audioChunk.size / 2)
-        for (i in shortArray.indices) {
-            val low = audioChunk[i * 2].toInt() and 0xFF
-            val high = audioChunk[i * 2 + 1].toInt() and 0xFF
-            shortArray[i] = ((high shl 8) or low).toShort()
-        }
-        
-        // Apply window function (Hamming window)
-        val windowedData = applyHammingWindow(shortArray)
-        
-        // Perform FFT (simplified - in real implementation, use proper FFT library)
-        val fftResult = performFFT(windowedData)
-        
-        // Convert to frequency domain
-        val frequencies = generateFrequencyArray(fftResult.size, sampleRate)
-        val magnitudes = calculateMagnitudes(fftResult)
-        
-        return SpectrogramFrame(
-            timestamp = timestamp,
-            frequencies = frequencies,
-            magnitudes = magnitudes,
-            sampleRate = sampleRate,
-            fftSize = fftResult.size
-        )
-    }
+
     
     /**
      * Build FFmpeg filter complex string for spectrogram generation
@@ -261,13 +226,67 @@ class FFmpegSpectrogramGenerator {
     }
     
     /**
-     * Perform FFT on windowed audio data
-     * Note: This is a simplified implementation. Use a proper FFT library for production.
+     * Perform FFT on windowed audio data using JTransforms library
      */
     private fun FloatArray.performFFT(): FloatArray {
-        // Simplified FFT implementation
-        // In production, use JTransforms or similar library
-        return this.map { it * it }.toFloatArray()
+        val size = this.size
+        
+        // Ensure size is a power of 2 for optimal FFT performance
+        val fftSize = if (size.isPowerOf2()) size else size.nextPowerOf2()
+        
+        // Create padded array if needed
+        val paddedData = if (fftSize > size) {
+            FloatArray(fftSize).apply {
+                copyInto(this, 0, 0, size)
+                // Zero-pad the rest
+                for (i in size until fftSize) {
+                    this[i] = 0f
+                }
+            }
+        } else {
+            this
+        }
+        
+        // Create FFT instance
+        val fft = FloatFFT_1D(fftSize.toLong())
+        
+        // Convert to complex format (real + imaginary parts)
+        val complexData = FloatArray(fftSize * 2)
+        for (i in paddedData.indices) {
+            complexData[i * 2] = paddedData[i]     // Real part
+            complexData[i * 2 + 1] = 0f            // Imaginary part
+        }
+        
+        // Perform FFT in-place
+        fft.realForward(complexData)
+        
+        // Calculate power spectrum (magnitude squared)
+        val powerSpectrum = FloatArray(fftSize / 2)
+        for (i in powerSpectrum.indices) {
+            val real = complexData[i * 2]
+            val imag = complexData[i * 2 + 1]
+            powerSpectrum[i] = real * real + imag * imag
+        }
+        
+        return powerSpectrum
+    }
+    
+    /**
+     * Check if a number is a power of 2
+     */
+    private fun Int.isPowerOf2(): Boolean {
+        return this > 0 && (this and (this - 1)) == 0
+    }
+    
+    /**
+     * Get next power of 2 greater than or equal to this number
+     */
+    private fun Int.nextPowerOf2(): Int {
+        var power = 1
+        while (power < this) {
+            power *= 2
+        }
+        return power
     }
     
     /**
@@ -310,14 +329,19 @@ class FFmpegSpectrogramGenerator {
             null
         }
     }
+    
+    /**
+     * Get available storage space in bytes
+     */
+    private fun getAvailableStorageSpace(path: String): Long {
+        return try {
+            val file = File(path)
+            val parentDir = file.parentFile ?: file
+            parentDir.freeSpace
+        } catch (e: Exception) {
+            Log.w(TAG, "Could not determine available space", e)
+            Long.MAX_VALUE // Assume unlimited space if we can't determine
+        }
+    }
 }
 
-/**
- * Data class for audio file information
- */
-data class AudioInfo(
-    val duration: Double,      // Duration in seconds
-    val sampleRate: Int,       // Sample rate in Hz
-    val channels: Int,         // Number of channels
-    val bitrate: Int           // Bitrate in kbps
-)

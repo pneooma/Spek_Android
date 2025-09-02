@@ -44,9 +44,15 @@ dependencies {
     implementation 'com.google.android.material:material:1.11.0'
     implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
     
+    // FFmpeg for audio processing
+    implementation 'com.arthenica:ffmpeg-kit-full:5.1'
+    
     // Audio processing libraries
     implementation 'com.beatunes:lame:1.0.0'  // MP3 encoding/decoding
     implementation 'com.github.wendykierp:JTransforms:3.1'  // FFT library
+    
+    // Audio metadata and cover art
+    implementation 'org.jaudiotagger:jaudiotagger:2.0.1'  // Audio metadata manipulation
     
     // Visualization
     implementation 'com.github.PhilJay:MPAndroidChart:v3.1.0'  // Charts and graphs

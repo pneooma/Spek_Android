@@ -29,8 +29,9 @@ class SpectrogramView @JvmOverloads constructor(
         private const val DEFAULT_AXIS_LABELS_ENABLED = true
     }
     
-    // Spectrogram data
-    private val spectrogramData = mutableListOf<SpectrogramFrame>()
+    // Spectrogram data management
+    private val dataManager = SpectrogramDataManager()
+    private var currentPage = 0
     private var maxMagnitude = 0f
     private var minMagnitude = 0f
     
@@ -53,6 +54,25 @@ class SpectrogramView @JvmOverloads constructor(
     
     init {
         initializePaints()
+        setupDataManager()
+    }
+    
+    /**
+     * Setup data manager callbacks
+     */
+    private fun setupDataManager() {
+        dataManager.setMemoryWarningCallback { warning ->
+            Log.w(TAG, "Memory warning: $warning")
+            // Could show a toast or notification to user
+        }
+        
+        dataManager.setPageLoadedCallback { pageIndex, frames ->
+            // Update view when new page is loaded
+            updateMagnitudeRange(frames)
+            invalidate()
+        }
+        
+
     }
     
     /**
@@ -88,35 +108,18 @@ class SpectrogramView @JvmOverloads constructor(
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
         
-        if (spectrogramData.isEmpty()) {
-            drawEmptyState(canvas)
-            return
-        }
-        
-        // Clear background
-        canvas.drawColor(Color.BLACK)
-        
-        // Draw spectrogram
-        drawSpectrogram(canvas)
-        
-        // Draw grid and labels
-        if (gridEnabled) {
-            drawGrid(canvas)
-        }
-        
-        if (axisLabelsEnabled) {
-            drawAxisLabels(canvas)
-        }
+        // For now, show empty state since we're not using real-time data
+        drawEmptyState(canvas)
     }
     
     /**
      * Draw the main spectrogram visualization
      */
-    private fun drawSpectrogram(canvas: Canvas) {
-        if (spectrogramData.isEmpty()) return
+    private fun drawSpectrogram(canvas: Canvas, data: List<SpectrogramFrame>) {
+        if (data.isEmpty()) return
         
-        val frameCount = spectrogramData.size
-        val frequencyCount = spectrogramData[0].frequencies.size
+        val frameCount = data.size
+        val frequencyCount = data[0].frequencies.size
         
         if (frameCount == 0 || frequencyCount == 0) return
         
@@ -124,8 +127,8 @@ class SpectrogramView @JvmOverloads constructor(
         val cellHeight = height.toFloat() / frequencyCount
         
         // Draw each cell of the spectrogram
-        for (timeIndex in spectrogramData.indices) {
-            val frame = spectrogramData[timeIndex]
+        for (timeIndex in data.indices) {
+            val frame = data[timeIndex]
             val x = timeIndex * cellWidth
             
             for (freqIndex in frame.frequencies.indices) {
@@ -321,27 +324,12 @@ class SpectrogramView @JvmOverloads constructor(
      * Update spectrogram data and redraw
      */
     fun updateSpectrogramData(newData: List<SpectrogramFrame>) {
-        spectrogramData.clear()
-        spectrogramData.addAll(newData)
-        
-        // Calculate magnitude range for normalization
-        if (spectrogramData.isNotEmpty()) {
-            maxMagnitude = spectrogramData.maxOfOrNull { frame ->
-                frame.magnitudes.maxOrNull() ?: 0f
-            } ?: 0f
-            
-            minMagnitude = spectrogramData.minOfOrNull { frame ->
-                frame.magnitudes.minOrNull() ?: 0f
-            } ?: 0f
-        }
+        dataManager.addFrames(newData)
         
         // Clear color cache for new data
         colorCache.clear()
         
-        // Request redraw
-        invalidate()
-        
-        Log.d(TAG, "Updated spectrogram data: ${spectrogramData.size} frames")
+        Log.d(TAG, "Updated spectrogram data: ${newData.size} frames")
     }
     
     /**
@@ -349,6 +337,21 @@ class SpectrogramView @JvmOverloads constructor(
      */
     fun setSpectrogramData(data: List<SpectrogramFrame>) {
         updateSpectrogramData(data)
+    }
+    
+    /**
+     * Update magnitude range for normalization
+     */
+    private fun updateMagnitudeRange(frames: List<SpectrogramFrame>) {
+        if (frames.isNotEmpty()) {
+            maxMagnitude = frames.maxOfOrNull { frame ->
+                frame.magnitudes.maxOrNull() ?: 0f
+            } ?: 0f
+            
+            minMagnitude = frames.minOfOrNull { frame ->
+                frame.magnitudes.minOrNull() ?: 0f
+            } ?: 0f
+        }
     }
     
     /**
@@ -378,12 +381,21 @@ class SpectrogramView @JvmOverloads constructor(
      * Clear all data and reset view
      */
     fun clear() {
-        spectrogramData.clear()
+        dataManager.clear()
         colorCache.clear()
         maxMagnitude = 0f
         minMagnitude = 0f
         invalidate()
     }
+    
+    /**
+     * Get memory usage statistics
+     */
+    fun getMemoryStats(): MemoryStats {
+        return dataManager.getMemoryStats()
+    }
+    
+
 }
 
 /**
