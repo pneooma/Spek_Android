@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaRecorder
 import android.os.Bundle
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -14,6 +15,7 @@ import com.example.spectrogramapp.databinding.ActivityMainBinding
 import com.example.spectrogramapp.spectrogram.FFmpegSpectrogramGenerator
 import com.example.spectrogramapp.spectrogram.RealTimeAudioProcessor
 import com.example.spectrogramapp.spectrogram.SpectrogramView
+import java.io.File
 
 class MainActivity : AppCompatActivity() {
     
@@ -104,7 +106,14 @@ class MainActivity : AppCompatActivity() {
         binding.progressBar.visibility = android.view.View.VISIBLE
         binding.tvStatus.text = "Processing audio file..."
         
-        val outputPath = "${getExternalFilesDir(null)}/spectrogram_output.png"
+        val outputPath = getExternalFilesDir(null)?.let { dir ->
+            "${dir}/spectrogram_output.png"
+        } ?: run {
+            binding.progressBar.visibility = android.view.View.GONE
+            binding.tvStatus.text = "Error: Cannot access external storage"
+            Toast.makeText(this, "Cannot access external storage", Toast.LENGTH_LONG).show()
+            return
+        }
         
         spectrogramGenerator.generateSpectrogram(
             audioFilePath,
@@ -131,9 +140,25 @@ class MainActivity : AppCompatActivity() {
     }
     
     private fun loadSpectrogramImage(imagePath: String) {
-        // Implementation to load and display the generated spectrogram image
-        // This would typically involve loading the image into an ImageView
-        // or parsing the spectrogram data for custom visualization
+        try {
+            val imageFile = File(imagePath)
+            if (imageFile.exists()) {
+                // For now, we'll just show a success message
+                // In a full implementation, you might want to:
+                // 1. Load the image into an ImageView
+                // 2. Parse the spectrogram data for custom visualization
+                // 3. Update the SpectrogramView with the parsed data
+                
+                binding.tvStatus.text = "Spectrogram image loaded successfully!"
+                Log.d("MainActivity", "Spectrogram image loaded from: $imagePath")
+            } else {
+                binding.tvStatus.text = "Error: Generated image not found"
+                Log.e("MainActivity", "Generated image not found at: $imagePath")
+            }
+        } catch (e: Exception) {
+            binding.tvStatus.text = "Error loading spectrogram image: ${e.message}"
+            Log.e("MainActivity", "Error loading spectrogram image", e)
+        }
     }
     
     private fun startRealTimeSpectrogram() {

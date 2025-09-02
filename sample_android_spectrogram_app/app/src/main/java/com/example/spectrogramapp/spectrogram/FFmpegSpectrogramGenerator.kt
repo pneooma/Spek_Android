@@ -267,7 +267,16 @@ class FFmpegSpectrogramGenerator {
     private fun FloatArray.performFFT(): FloatArray {
         // Simplified FFT implementation
         // In production, use JTransforms or similar library
-        return this.map { it * it }.toFloatArray()
+        // For now, we'll use a basic power spectrum calculation
+        val size = this.size
+        val result = FloatArray(size)
+        
+        // Simple power spectrum calculation
+        for (i in 0 until size) {
+            result[i] = this[i] * this[i]
+        }
+        
+        return result
     }
     
     /**
@@ -312,12 +321,3 @@ class FFmpegSpectrogramGenerator {
     }
 }
 
-/**
- * Data class for audio file information
- */
-data class AudioInfo(
-    val duration: Double,      // Duration in seconds
-    val sampleRate: Int,       // Sample rate in Hz
-    val channels: Int,         // Number of channels
-    val bitrate: Int           // Bitrate in kbps
-)

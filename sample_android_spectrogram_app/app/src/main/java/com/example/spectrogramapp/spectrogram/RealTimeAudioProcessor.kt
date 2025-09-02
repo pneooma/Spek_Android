@@ -209,13 +209,14 @@ class RealTimeAudioProcessor {
             withContext(Dispatchers.Default) {
                 spectrogramGenerator.generateRealTimeSpectrogram(
                     audioData,
-                    sampleRate
-                ) { frame ->
-                    // Send frame data to callback on main thread
-                    mainHandler.post {
-                        onFrameDataCallback?.invoke(frame)
+                    sampleRate,
+                    onFrameData = { frame ->
+                        // Send frame data to callback on main thread
+                        mainHandler.post {
+                            onFrameDataCallback?.invoke(frame)
+                        }
                     }
-                }
+                )
             }
             
         } catch (e: Exception) {
